@@ -65,6 +65,9 @@ export default function Page() {
     setStatusLog((prev) => [`${new Date().toLocaleTimeString()} · ${line}`, ...prev].slice(0, 50));
   }, []);
 
+  const [tourRunning, setTourRunning] = useState(false);
+  const [tourStep, setTourStep] = useState<string | null>(null);
+
   // Load WASM
   useEffect(() => {
     let cancelled = false;
@@ -163,11 +166,92 @@ export default function Page() {
     refresh();
   }, [wasm, log, refresh]);
 
+  // Guided tour: runs publish → broadcast (waku) → anchor (third party) → lookup
+  // with narration in the activity log. Designed for the screen recording — every step
+  // is paced so the viewer can follow the visual flow between the three panels.
+  const runTour = useCallback(async () => {
+    if (!wasm || tourRunning) return;
+    setTourRunning(true);
+    wasm.resetDemoState();
+    setLookupResult(null);
+    setStatusLog([]);
+
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const sample = new TextEncoder().encode(
+      "INTERNAL — Q3 FY26\nSubject: Vendor exposure review\n\nThis document demonstrates the Whistleblower publication pipeline.\nThe content addressed CID below will be discoverable peer-to-peer\nand anchored on-chain without the publisher's coordination.\n",
+    );
+
+    setTourStep("Publisher: uploading file to Codex storage");
+    log("[1/4] PUBLISHER uploads bytes to Codex…");
+    await wait(800);
+
+    const pubResp = wasm.publishFileJson(
+      JSON.stringify({
+        title: "Vendor exposure review (sample)",
+        description: "Sample document for the guided tour.",
+        content_type: "text/plain",
+        tags: ["sample", "guided-tour"],
+        broadcast: true,
+      }),
+      sample,
+    );
+    if (!pubResp?.ok) {
+      log(`tour aborted: publish failed (${pubResp?.error ?? "unknown"})`);
+      setTourRunning(false);
+      setTourStep(null);
+      return;
+    }
+    refresh();
+    log(`       got CID: ${pubResp.cid.slice(0, 18)}…  (${sample.length} bytes stored)`);
+    await wait(1200);
+
+    setTourStep("Broadcaster: envelope published on Waku topic");
+    log("[2/4] DELIVERY: envelope broadcast on the Waku topic.");
+    log("       Anyone subscribed sees this in real time.");
+    await wait(1600);
+
+    setTourStep("Third party: picks up the broadcast and anchors it on-chain");
+    log("[3/4] THIRD-PARTY WATCHER anchors the CID on LEZ chronicle-registry.");
+    log("       (the publisher did NOT need to be online or hold tokens)");
+    const anchorResp = wasm.anchorBatchJson(
+      JSON.stringify({
+        entries: [{ cid: pubResp.cid, metadata_hash: pubResp.metadata_hash }],
+      }),
+    );
+    if (anchorResp?.ok) {
+      log(`       anchored in tx=${anchorResp.tx_hash}`);
+    }
+    refresh();
+    await wait(1400);
+
+    setTourStep("Anyone: query the registry by CID");
+    log("[4/4] ANYONE can now query the registry by CID.");
+    const lookupResp = wasm.lookupJson(JSON.stringify({ cid: pubResp.cid }));
+    setLookupResult(lookupResp);
+    setLookupCid(pubResp.cid);
+    if (lookupResp?.entry) {
+      log(`       lookup → found, anchored at t+${lookupResp.entry.anchor_timestamp}`);
+    }
+    await wait(1000);
+
+    log("[done] document is now durably published, discoverable, AND on-chain.");
+    setTourStep(null);
+    setTourRunning(false);
+  }, [wasm, tourRunning, log, refresh]);
+
   const topic = useMemo(() => wasm?.getTopic() ?? "/whistleblower/1/document-index/borsh", [wasm]);
 
   return (
     <main className="min-h-screen bg-[rgb(12_12_14)] text-[rgb(240_240_240)] font-mono">
-      <Hero />
+      <Hero onRunTour={runTour} tourRunning={tourRunning} canRun={wasm !== null} />
+
+      {tourStep && (
+        <div className="bg-lime-500 text-black border-y border-lime-600">
+          <div className="max-w-6xl mx-auto px-6 py-3 text-sm font-semibold">
+            ▶ Guided tour: {tourStep}
+          </div>
+        </div>
+      )}
 
       <section className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6">
         <PublishPanel
@@ -195,7 +279,7 @@ export default function Page() {
         <div className="space-y-4">
           <LayerPanel
             title="Codex storage"
-            subtitle="content-addressed bytes"
+            subtitle="content-addressed bytes · publisher's responsibility"
             color="violet"
             count={published.length}
           >
@@ -219,8 +303,8 @@ export default function Page() {
           </LayerPanel>
 
           <LayerPanel
-            title="Waku topic"
-            subtitle={topic}
+            title="Waku delivery"
+            subtitle={`${topic} · anyone subscribes`}
             color="sky"
             count={deliveryLog.length}
           >
@@ -245,7 +329,7 @@ export default function Page() {
 
           <LayerPanel
             title="LEZ chronicle-registry"
-            subtitle="on-chain (anchored)"
+            subtitle="on-chain · anchored by any third party"
             color="lime"
             count={registry.length}
           >
@@ -321,7 +405,15 @@ export default function Page() {
   );
 }
 
-function Hero() {
+function Hero({
+  onRunTour,
+  tourRunning,
+  canRun,
+}: {
+  onRunTour: () => void;
+  tourRunning: boolean;
+  canRun: boolean;
+}) {
   return (
     <header className="border-b border-[rgb(40_40_48)] bg-gradient-to-b from-[rgb(18_18_22)] to-[rgb(12_12_14)]">
       <div className="max-w-6xl mx-auto px-6 py-10">
@@ -338,12 +430,24 @@ function Hero() {
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3">
           Whistleblower
         </h1>
-        <p className="text-[rgb(200_200_210)] max-w-2xl">
+        <p className="text-[rgb(200_200_210)] max-w-2xl mb-4">
           A censorship-resistant document upload and indexing app for the Logos Basecamp.
           Upload to Codex, broadcast on Waku, anchor on LEZ —{" "}
           <span className="text-lime-400">permissionlessly</span>, by anyone.
         </p>
-        <p className="text-xs text-[rgb(130_130_140)] mt-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={onRunTour}
+            disabled={!canRun || tourRunning}
+            className="bg-lime-500 hover:bg-lime-400 text-black font-semibold disabled:opacity-40 disabled:cursor-not-allowed rounded px-5 py-2 text-sm transition"
+          >
+            {tourRunning ? "Running tour…" : "▶ Run guided tour"}
+          </button>
+          <span className="text-xs text-[rgb(130_130_140)]">
+            or scroll down to publish your own document
+          </span>
+        </div>
+        <p className="text-xs text-[rgb(130_130_140)] mt-4 max-w-2xl">
           This page runs the same Rust orchestration logic as the production Basecamp module,
           compiled to WebAssembly. Mock storage / delivery / registry are in-process — no Logos
           infrastructure needed to try the UX.

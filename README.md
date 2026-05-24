@@ -1,21 +1,21 @@
 # Whistleblower
 
-A reference Logos Basecamp app for censorship-resistant document publication, plus
-a reusable document-indexing module that any Logos app can depend on.
+> **🌐 Live demo:** _[Vercel URL — pending deploy, see [docs/DEPLOY.md](docs/DEPLOY.md)]_
+> &nbsp;·&nbsp; **🎥 Walkthrough:** _[recording URL — see [docs/RECORDING_SCRIPT.md](docs/RECORDING_SCRIPT.md)]_
 
-> **Status:** architecture + scaffold + tests + mocks + interactive web demo. Real Logos
-> backend integration (Codex / Waku / SPEL CLI) lives behind the `--features real-logos`
-> and `--features real-spel` flags as stubs ready to be wired up. See
-> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for what's built and what's next.
+A reference Logos Basecamp app for censorship-resistant document publication, plus
+a reusable document-indexing module that any Logos app can depend on. The same Rust
+orchestration logic runs both in the production Basecamp module and in the browser
+demo — compiled to WebAssembly — so you can click "Run guided tour" on the live URL
+above and watch the upload → broadcast → anchor pipeline happen in real time, no
+Logos infrastructure needed.
 
 Submitted to [LP-0017 · Whistleblower](https://github.com/logos-co/lambda-prize/blob/main/prizes/LP-0017.md).
 
-## Try it in your browser
-
-The reusable Rust orchestration module is compiled to WebAssembly and runs in a Next.js
-page hosted on Vercel — try the upload → broadcast → anchor flow without installing
-anything. See [web/](web/) for the source and [scripts/vercel-build.sh](scripts/vercel-build.sh)
-for the deployment config.
+> **Status:** architecture + scaffold + tests + mocks + interactive WASM demo. Real
+> Logos backend integration (Codex / Waku / SPEL CLI) lives behind the `--features
+> real-logos` and `--features real-spel` flags as stubs ready to be wired up. See
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for what's built and what's next.
 
 ## What this is
 
