@@ -1,0 +1,29 @@
+{
+  "name": "whistleblower-web-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-based demo of the Whistleblower upload → broadcast → anchor pipeline. WASM-compiled doc-index-core powers a Next.js UI.",
+  "scripts": {
+    "wasm": "cd ../web-demo && wasm-pack build --target web --out-dir ../web/lib/pkg --release",
+    "dev": "npm run wasm && next dev",
+    "build": "npm run wasm && next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4"
+  }
+}

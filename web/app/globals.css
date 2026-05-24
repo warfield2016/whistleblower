@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 12 12 14;
+  --fg: 240 240 240;
+  --muted: 130 130 140;
+  --accent: 132 204 22;       /* lime-500 — "permissionless" green */
+  --warn: 251 146 60;          /* orange-400 */
+  --panel: 22 22 26;
+  --border: 40 40 48;
+}
+
+html, body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+}
+
+body {
+  font-feature-settings: "ss01", "ss02";
+}

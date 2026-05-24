@@ -1,0 +1,69 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/registry-core",
+    "crates/doc-index-core",
+    "crates/doc-index-cli",
+    "crates/batch-anchor",
+    "programs/chronicle-registry",
+]
+# web-demo is built via wasm-pack, not part of the default workspace build.
+# It depends on registry-core via path and is intentionally excluded so
+# `cargo test --workspace` stays fast and doesn't try to build for wasm32.
+exclude = ["web-demo"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["LP-0017 contributors"]
+repository = "https://github.com/<TBD>/whistleblower"
+rust-version = "1.78"
+
+[workspace.dependencies]
+registry-core = { path = "crates/registry-core", version = "0.1.0", default-features = false }
+doc-index-core = { path = "crates/doc-index-core", version = "0.1.0" }
+
+# Async
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+borsh = { version = "1.5", features = ["derive"] }
+
+# Crypto / hashing
+sha2 = "0.10"
+blake3 = "1.5"
+ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"] }
+hex = "0.4"
+bs58 = "0.5"
+rand = "0.8"
+
+# Errors / logging
+thiserror = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# State storage (batch anchor idempotency)
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Time / ids
+uuid = { version = "1.10", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Testing
+proptest = "1.4"
+tempfile = "3.10"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -1,0 +1,36 @@
+{
+  "name": "whistleblower",
+  "version": "0.1.0",
+  "type": "ui_qml",
+  "category": "ui",
+  "main": "whistleblower_plugin",
+  "view": "qml/Main.qml",
+  "icon": "icons/whistleblower.png",
+  "description": "Upload a document, broadcast it for immediate discoverability, optionally anchor it on the LEZ chronicle-registry. Censorship-resistant publication on the Logos stack.",
+  "author": "LP-0017 contributors",
+  "license": "MIT OR Apache-2.0",
+  "dependencies": [
+    "doc-index",
+    "storage_module",
+    "delivery_module"
+  ],
+  "nix": {
+    "packages": {
+      "build": [],
+      "runtime": []
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  },
+  "capabilities": [
+    "file_upload",
+    "metadata_form",
+    "on_chain_anchor",
+    "registry_query"
+  ]
+}

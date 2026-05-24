@@ -1,0 +1,27 @@
+[package]
+name = "chronicle-registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "LEZ program that records (CID, metadata_hash, anchor_timestamp) tuples for Whistleblower documents."
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+registry-core = { workspace = true }
+borsh = { workspace = true }
+thiserror = { workspace = true }
+
+# SPEL framework — gated behind a feature so the workspace compiles without the
+# logos-co/spel git dependency until the LEZ build environment is set up.
+# Wire this in once `lgs setup` has run and the spel-framework crate is on the path.
+# spel-framework = { git = "https://github.com/logos-co/spel", rev = "<TBD>" }
+# nssa-core      = { git = "https://github.com/logos-blockchain/logos-execution-zone", tag = "v0.1.0" }
+# risc0-zkvm     = { version = "3.0.5", default-features = false, features = ["std"] }
+
+[features]
+default = []
+# Enable when building against real SPEL + nssa from a Logos dev environment.
+# Leave off in CI to keep cargo check fast and dependency-free.
+real-spel = []

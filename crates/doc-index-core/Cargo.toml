@@ -1,0 +1,51 @@
+[package]
+name = "doc-index-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Reusable document-indexing module: upload → broadcast → anchor pipeline over the Logos stack."
+
+[lib]
+name = "doc_index_core"
+# `cdylib` so cbindgen can produce a C ABI shared library (.so/.dylib/.dll)
+# loadable by Basecamp's QML bridge or any FFI host.
+# `rlib` so Rust consumers (doc-index-cli, batch-anchor, tests) can link statically.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+registry-core = { workspace = true }
+
+borsh = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+bs58 = { workspace = true }
+hex = { workspace = true }
+
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = { workspace = true }
+proptest = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[features]
+default = []
+# Real Logos backends (FFI to liblogosstorage / liblogosdelivery / lgs CLI).
+# Empty stubs in this scaffold; wire up during integration phase.
+real-logos = []
+
+[build-dependencies]
+# cbindgen runs at build time to generate the C header.
+# Disabled until we have a stable public C API; uncomment when the FFI surface settles.
+# cbindgen = "0.27"
