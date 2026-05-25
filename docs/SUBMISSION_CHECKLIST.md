@@ -30,11 +30,12 @@ investing in real-Logos integration. Cheap, high-leverage.
   - [x] Root `Makefile` added with `build`, `idl`, `deploy`, `setup`, `cli`, `test`,
     `fmt`, `clippy`, `ci`, `web`, `demo`, `status`, `clean` targets — matches their
     tooling polish
-- [ ] **0.1c** Wire-format upgrade (still pending — adopt before phase 2 deploy):
-  - Add `anchored_by: [u8; 32]` and `version: u8` to `RegistryEntry`
-  - Switch `Registry` from `Vec<RegistryEntry>` to `HashMap<String, RegistryEntry>` for O(1) lookup
-  - Switch `anchor_timestamp` from `u64` to `i64`
-  - Acceptance: `cargo test -p registry-core -p chronicle-registry` passes after changes
+- [x] **0.1c** Wire-format upgrade ✅ (commit `db35e39`):
+  - [x] Added `anchored_by: [u8; 32]` and `version: u8` to `RegistryEntry`
+  - [x] Switched `Registry` from `Vec<RegistryEntry>` to `HashMap<String, RegistryEntry>` for O(1) lookup
+  - [x] Switched `anchor_timestamp` from `u64` to `i64`
+  - [x] WASM crate + TypeScript types updated to match
+  - [x] 46 tests passing (gained 2 new tests for `anchored_by`/`version` + negative timestamps)
 - [ ] **0.2** Vercel deploy. Follow [DEPLOY.md](DEPLOY.md). Wait ~5-7 min for first build.
   - Acceptance: live URL loads, "Run guided tour" button works end-to-end, lookup
     panel populates after the tour
