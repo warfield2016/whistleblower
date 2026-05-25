@@ -22,7 +22,19 @@ pub const METADATA_HASH_PREFIX: &str = "v1:";
 /// Default Waku content topic for Whistleblower document broadcasts (LIP-23 format).
 pub const DEFAULT_WAKU_TOPIC: &str = "/whistleblower/1/document-index/borsh";
 
+/// Current `RegistryEntry::version` written by the program. Bump when adding fields so
+/// readers can branch on the value of `entry.version` and handle old + new shapes.
+pub const CURRENT_REGISTRY_ENTRY_VERSION: u8 = 1;
+
 /// One anchored document in the registry.
+///
+/// Stored on-chain inside `RegistryState.entries`, a `HashMap<String, RegistryEntry>` keyed on
+/// the CID. The `cid` field is kept inside the record for ergonomics — callers reading a single
+/// entry through `Indexer::lookup` get a self-describing record without needing to remember
+/// which key they queried.
+///
+/// **Invariant:** the HashMap key MUST equal `entry.cid`. The transition function in
+/// `chronicle-registry::apply_instruction` is the single insertion site and enforces this.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct RegistryEntry {
     /// Codex content identifier, multibase-encoded (e.g. "zDvZRwzk...").
@@ -30,7 +42,15 @@ pub struct RegistryEntry {
     /// sha256 of the canonical envelope, raw bytes (no "v1:" prefix here).
     pub metadata_hash: [u8; METADATA_HASH_LEN],
     /// Unix seconds when the anchor transaction was processed.
-    pub anchor_timestamp: u64,
+    /// Signed `i64` (not `u64`) to allow negative test values and match the broader LEZ
+    /// timestamp convention.
+    pub anchor_timestamp: i64,
+    /// Public-key-style identifier of the account that submitted this anchor. Enables
+    /// third-party audit ("who anchored this CID?") without coupling to the publisher.
+    /// All zeros for mock / pre-real-LEZ entries.
+    pub anchored_by: [u8; 32],
+    /// Schema version of this record. Future field additions bump this; readers branch on it.
+    pub version: u8,
 }
 
 /// Instruction set accepted by chronicle-registry.

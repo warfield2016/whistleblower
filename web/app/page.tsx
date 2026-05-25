@@ -37,7 +37,12 @@ type Envelope = {
 type RegistryEntry = {
   cid: string;
   metadata_hash: number[];
+  /** Signed because the wire format is i64 (allows negative for tests / forward-compat). */
   anchor_timestamp: number;
+  /** 32-byte signer identifier. All-zero from MockAnchor, 0xDE-bytes from the WASM demo. */
+  anchored_by: number[];
+  /** RegistryEntry schema version. Future field additions bump this; readers branch on it. */
+  version: number;
 };
 
 export default function Page() {

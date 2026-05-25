@@ -138,14 +138,18 @@ impl AnchorClient for MockAnchor {
             )));
         }
 
-        let now = chrono::Utc::now().timestamp() as u64;
+        let now = chrono::Utc::now().timestamp();
         let mut store = self.entries.write().await;
         for req in entries {
             // Idempotency: skip CIDs already anchored, matching the on-chain program's behavior.
+            // anchored_by is [0u8; 32] for mock — the real client populates it from the LEZ
+            // signer account; tests that need a specific anchorer construct entries directly.
             store.entry(req.cid.clone()).or_insert(RegistryEntry {
                 cid: req.cid,
                 metadata_hash: req.metadata_hash,
                 anchor_timestamp: now,
+                anchored_by: [0u8; 32],
+                version: registry_core::CURRENT_REGISTRY_ENTRY_VERSION,
             });
         }
 

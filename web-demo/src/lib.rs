@@ -18,7 +18,8 @@ use std::collections::HashMap;
 
 use registry_core::{
     format_metadata_hash, looks_like_cid, metadata_hash, parse_metadata_hash, Envelope,
-    EntryRequest, RegistryEntry, DEFAULT_WAKU_TOPIC, MAX_BATCH_ENTRIES,
+    EntryRequest, RegistryEntry, CURRENT_REGISTRY_ENTRY_VERSION, DEFAULT_WAKU_TOPIC,
+    MAX_BATCH_ENTRIES,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -79,6 +80,11 @@ fn synth_cid(bytes: &[u8]) -> String {
 fn now_ts() -> u64 {
     let ms = js_sys::Date::now();
     (ms / 1000.0) as u64
+}
+
+fn now_ts_i64() -> i64 {
+    let ms = js_sys::Date::now();
+    (ms / 1000.0) as i64
 }
 
 /// Serialize to a JsValue using the JSON-compatible mode.
@@ -256,9 +262,12 @@ pub fn anchor_batch_json(request_json: &str) -> JsValue {
         let mut state = s.borrow_mut();
         state.tx_counter += 1;
         let tx_hash = format!("demo-tx-{:016x}", state.tx_counter);
-        let ts = now_ts();
+        let ts = now_ts_i64();
         let mut anchored = Vec::new();
         let mut skipped = Vec::new();
+        // In the browser demo we don't have a real signer — use a deterministic byte pattern
+        // that distinguishes WASM-anchored entries from mock ([0u8; 32]) and real ([signer]).
+        let demo_anchored_by = [0xDEu8; 32];
         for entry in parsed {
             if state.anchored.contains_key(&entry.cid) {
                 skipped.push(entry.cid);
@@ -269,6 +278,8 @@ pub fn anchor_batch_json(request_json: &str) -> JsValue {
                         cid: entry.cid.clone(),
                         metadata_hash: entry.metadata_hash,
                         anchor_timestamp: ts,
+                        anchored_by: demo_anchored_by,
+                        version: CURRENT_REGISTRY_ENTRY_VERSION,
                     },
                 );
                 anchored.push(entry.cid);

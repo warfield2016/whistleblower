@@ -30,27 +30,43 @@
 //! the transition logic without spinning up a sequencer, and reuse the same logic in the
 //! `MockAnchor` for end-to-end testing of clients.
 
+use std::collections::HashMap;
+
 use borsh::{BorshDeserialize, BorshSerialize};
 use registry_core::{
-    error_codes, looks_like_cid, EntryRequest, Instruction, RegistryEntry, MAX_BATCH_ENTRIES,
+    error_codes, looks_like_cid, EntryRequest, Instruction, RegistryEntry,
+    CURRENT_REGISTRY_ENTRY_VERSION, MAX_BATCH_ENTRIES,
 };
 
 /// The on-chain state of the registry. Lives in the data field of the registry PDA.
+///
+/// Entries live in a `HashMap` keyed on CID, giving O(1) lookup and contains-check vs the
+/// O(N) linear scan of the previous `Vec` layout. Borsh serializes `HashMap` deterministically
+/// (sorted by key) so on-chain bytes remain identical across guest executions.
+///
+/// **Invariant:** the HashMap key always equals `value.cid`. Enforced at the single insertion
+/// site in [`apply_instruction`]; all read paths can assume it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct RegistryState {
     pub initialized: bool,
-    pub entries: Vec<RegistryEntry>,
+    pub entries: HashMap<String, RegistryEntry>,
 }
 
 impl RegistryState {
     pub fn contains(&self, cid: &str) -> bool {
-        // Linear scan — acceptable up to a few thousand entries; if this becomes a CU bottleneck
-        // we move to a sorted Vec + binary search or a separate index account.
-        self.entries.iter().any(|e| e.cid == cid)
+        self.entries.contains_key(cid)
     }
 
     pub fn get(&self, cid: &str) -> Option<&RegistryEntry> {
-        self.entries.iter().find(|e| e.cid == cid)
+        self.entries.get(cid)
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }
 
@@ -91,12 +107,15 @@ impl TransitionError {
 
 /// Pure transition function. The SPEL program wrapper and the off-chain mock both call this.
 ///
-/// `anchor_timestamp` is supplied by the caller (the program reads it from the LEZ block
-/// context; tests inject a fixed value) so this function stays pure.
+/// `anchor_timestamp` and `anchored_by` are supplied by the caller — the program reads them
+/// from the LEZ block context + signer account, tests inject fixed values. Keeping them as
+/// parameters preserves purity, which is what makes this function unit-testable without a
+/// running sequencer.
 pub fn apply_instruction(
     state: RegistryState,
     instruction: Instruction,
-    anchor_timestamp: u64,
+    anchor_timestamp: i64,
+    anchored_by: [u8; 32],
 ) -> Result<ApplyOutcome, TransitionError> {
     match instruction {
         Instruction::InitRegistry => {
@@ -106,7 +125,7 @@ pub fn apply_instruction(
             Ok(ApplyOutcome {
                 new_state: RegistryState {
                     initialized: true,
-                    entries: Vec::new(),
+                    entries: HashMap::new(),
                 },
                 appended_cids: Vec::new(),
                 skipped_duplicate_cids: Vec::new(),
@@ -138,14 +157,20 @@ pub fn apply_instruction(
             let mut skipped = Vec::new();
 
             for EntryRequest { cid, metadata_hash } in entries {
-                if new_state.contains(&cid) {
+                if new_state.entries.contains_key(&cid) {
                     skipped.push(cid);
                 } else {
-                    new_state.entries.push(RegistryEntry {
-                        cid: cid.clone(),
-                        metadata_hash,
-                        anchor_timestamp,
-                    });
+                    // Invariant: HashMap key == entry.cid (single insertion site).
+                    new_state.entries.insert(
+                        cid.clone(),
+                        RegistryEntry {
+                            cid: cid.clone(),
+                            metadata_hash,
+                            anchor_timestamp,
+                            anchored_by,
+                            version: CURRENT_REGISTRY_ENTRY_VERSION,
+                        },
+                    );
                     appended.push(cid);
                 }
             }
@@ -245,6 +270,8 @@ mod tests {
     use super::*;
     use registry_core::EntryRequest;
 
+    const TEST_ANCHORER: [u8; 32] = [9u8; 32];
+
     fn entry(cid: &str) -> EntryRequest {
         // Pad short test CIDs to the realistic Codex length so they pass the validator.
         let padded = if cid.len() < 10 {
@@ -259,15 +286,25 @@ mod tests {
     }
 
     fn initialized() -> RegistryState {
-        apply_instruction(RegistryState::default(), Instruction::InitRegistry, 0)
-            .unwrap()
-            .new_state
+        apply_instruction(
+            RegistryState::default(),
+            Instruction::InitRegistry,
+            0,
+            TEST_ANCHORER,
+        )
+        .unwrap()
+        .new_state
     }
 
     #[test]
     fn init_creates_empty_initialized_state() {
-        let outcome =
-            apply_instruction(RegistryState::default(), Instruction::InitRegistry, 42).unwrap();
+        let outcome = apply_instruction(
+            RegistryState::default(),
+            Instruction::InitRegistry,
+            42,
+            TEST_ANCHORER,
+        )
+        .unwrap();
         assert!(outcome.new_state.initialized);
         assert!(outcome.new_state.entries.is_empty());
         assert!(outcome.appended_cids.is_empty());
@@ -276,7 +313,8 @@ mod tests {
     #[test]
     fn cannot_init_twice() {
         let state = initialized();
-        let err = apply_instruction(state, Instruction::InitRegistry, 0).unwrap_err();
+        let err =
+            apply_instruction(state, Instruction::InitRegistry, 0, TEST_ANCHORER).unwrap_err();
         assert_eq!(err, TransitionError::AlreadyInitialized);
     }
 
@@ -288,11 +326,33 @@ mod tests {
                 entries: vec![entry("zABC"), entry("zDEF")],
             },
             100,
+            TEST_ANCHORER,
         )
         .unwrap();
         assert_eq!(outcome.appended_cids.len(), 2);
         assert_eq!(outcome.new_state.entries.len(), 2);
-        assert_eq!(outcome.new_state.entries[0].anchor_timestamp, 100);
+        // HashMap has no ordering — pick any entry and check the timestamp.
+        let any = outcome.new_state.entries.values().next().unwrap();
+        assert_eq!(any.anchor_timestamp, 100);
+    }
+
+    #[test]
+    fn index_batch_populates_anchored_by_and_version() {
+        let outcome = apply_instruction(
+            initialized(),
+            Instruction::IndexBatch {
+                entries: vec![entry("zNEW")],
+            },
+            100,
+            TEST_ANCHORER,
+        )
+        .unwrap();
+        let cid = outcome.appended_cids[0].clone();
+        let entry = outcome.new_state.get(&cid).unwrap();
+        assert_eq!(entry.anchored_by, TEST_ANCHORER);
+        assert_eq!(entry.version, CURRENT_REGISTRY_ENTRY_VERSION);
+        // Invariant: HashMap key matches entry.cid.
+        assert_eq!(&entry.cid, &cid);
     }
 
     #[test]
@@ -304,6 +364,7 @@ mod tests {
                 entries: vec![first_entry.clone()],
             },
             100,
+            TEST_ANCHORER,
         )
         .unwrap();
         let after_second = apply_instruction(
@@ -312,14 +373,17 @@ mod tests {
                 entries: vec![first_entry.clone(), entry("zNEW")],
             },
             200,
+            [7u8; 32], // different anchorer
         )
         .unwrap();
         assert_eq!(after_second.appended_cids.len(), 1);
         assert_eq!(after_second.skipped_duplicate_cids.len(), 1);
         assert_eq!(after_second.new_state.entries.len(), 2);
-        // First entry keeps its original timestamp despite the re-submission.
+        // First entry keeps its original timestamp AND its original anchorer despite the
+        // re-submission — idempotency means we don't overwrite.
         let abc = after_second.new_state.get(&first_entry.cid).unwrap();
         assert_eq!(abc.anchor_timestamp, 100);
+        assert_eq!(abc.anchored_by, TEST_ANCHORER);
     }
 
     #[test]
@@ -328,6 +392,7 @@ mod tests {
             initialized(),
             Instruction::IndexBatch { entries: vec![] },
             0,
+            TEST_ANCHORER,
         )
         .unwrap_err();
         assert_eq!(err, TransitionError::BatchEmpty);
@@ -338,8 +403,13 @@ mod tests {
         let entries: Vec<EntryRequest> = (0..(MAX_BATCH_ENTRIES + 1))
             .map(|i| entry(&format!("z{:03}", i)))
             .collect();
-        let err =
-            apply_instruction(initialized(), Instruction::IndexBatch { entries }, 0).unwrap_err();
+        let err = apply_instruction(
+            initialized(),
+            Instruction::IndexBatch { entries },
+            0,
+            TEST_ANCHORER,
+        )
+        .unwrap_err();
         assert!(matches!(err, TransitionError::BatchOversized { .. }));
     }
 
@@ -351,6 +421,7 @@ mod tests {
                 entries: vec![entry("zABC")],
             },
             0,
+            TEST_ANCHORER,
         )
         .unwrap_err();
         assert_eq!(err, TransitionError::Uninitialized);
@@ -367,6 +438,7 @@ mod tests {
             initialized(),
             Instruction::IndexBatch { entries: vec![bad] },
             0,
+            TEST_ANCHORER,
         )
         .unwrap_err();
         match err {
@@ -388,6 +460,7 @@ mod tests {
                 entries: vec![entry("zGOOD"), bad],
             },
             0,
+            TEST_ANCHORER,
         )
         .unwrap_err();
         assert!(matches!(err, TransitionError::InvalidCid(_)));
@@ -398,6 +471,7 @@ mod tests {
                 entries: vec![entry("zGOOD")],
             },
             0,
+            TEST_ANCHORER,
         )
         .unwrap();
         assert_eq!(outcome.new_state.entries.len(), 1);
@@ -409,5 +483,22 @@ mod tests {
         let bytes = borsh::to_vec(&state).unwrap();
         let parsed: RegistryState = borsh::from_slice(&bytes).unwrap();
         assert_eq!(state, parsed);
+    }
+
+    #[test]
+    fn negative_anchor_timestamps_supported() {
+        // i64 lets us round-trip negative values (forward-compat for pre-epoch test fixtures
+        // and any LEZ block context that yields signed timestamps).
+        let outcome = apply_instruction(
+            initialized(),
+            Instruction::IndexBatch {
+                entries: vec![entry("zNEG")],
+            },
+            -1,
+            TEST_ANCHORER,
+        )
+        .unwrap();
+        let cid = &outcome.appended_cids[0];
+        assert_eq!(outcome.new_state.get(cid).unwrap().anchor_timestamp, -1);
     }
 }
