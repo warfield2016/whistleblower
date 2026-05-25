@@ -1,0 +1,42 @@
+{
+  "name": "doc-index",
+  "version": "0.1.0",
+  "type": "core",
+  "category": "ai",
+  "interface": "universal",
+  "description": "Reusable upload → broadcast → anchor pipeline for censorship-resistant document publication on the Logos stack.",
+  "main": "doc_index_plugin",
+  "codegen": {
+    "impl_header": "doc_index_plugin.h"
+  },
+  "dependencies": [
+    "storage_module",
+    "delivery_module"
+  ],
+  "include": [
+    "libdoc_index_core.so",
+    "libdoc_index_core.dylib",
+    "libdoc_index_core.dll"
+  ],
+  "nix": {
+    "external_libraries": [
+      { "name": "doc_index_core", "build_command": "cargo build --release -p doc-index-core" }
+    ],
+    "cmake": {
+      "extra_include_dirs": ["target/release/include"]
+    }
+  },
+  "capabilities": [
+    "publish",
+    "broadcast",
+    "anchor",
+    "lookup",
+    "list"
+  ],
+  "exports": [
+    "publishFileJson",
+    "anchorBatchJson",
+    "lookupJson",
+    "listPublishedJson"
+  ]
+}

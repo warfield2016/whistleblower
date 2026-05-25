@@ -21,19 +21,33 @@ reviewer: `weboko`). **Check its status before starting each phase.**
 Goal: ensure the current artifacts are as visible and polished as they can be before
 investing in real-Logos integration. Cheap, high-leverage.
 
-- [ ] **0.1** Vercel deploy. Follow [DEPLOY.md](DEPLOY.md). Wait ~5-7 min for first build.
+- [x] **0.1a** Competitor analysis. See [`COMPETITOR_ANALYSIS.md`](COMPETITOR_ANALYSIS.md)
+  for the full intel snapshot. Status at 2026-05-25: PR open since May 12, reviewer
+  promised feedback May 19 (6 days ago, no follow-up). Window is real.
+- [x] **0.1b** Defensive parity moves from competitor analysis:
+  - [x] `module.json` files added to `app/` and `crates/doc-index-core/` (clears the
+    GitHub Action validation warning their PR triggered)
+  - [x] Root `Makefile` added with `build`, `idl`, `deploy`, `setup`, `cli`, `test`,
+    `fmt`, `clippy`, `ci`, `web`, `demo`, `status`, `clean` targets — matches their
+    tooling polish
+- [ ] **0.1c** Wire-format upgrade (still pending — adopt before phase 2 deploy):
+  - Add `anchored_by: [u8; 32]` and `version: u8` to `RegistryEntry`
+  - Switch `Registry` from `Vec<RegistryEntry>` to `HashMap<String, RegistryEntry>` for O(1) lookup
+  - Switch `anchor_timestamp` from `u64` to `i64`
+  - Acceptance: `cargo test -p registry-core -p chronicle-registry` passes after changes
+- [ ] **0.2** Vercel deploy. Follow [DEPLOY.md](DEPLOY.md). Wait ~5-7 min for first build.
   - Acceptance: live URL loads, "Run guided tour" button works end-to-end, lookup
     panel populates after the tour
   - ⚠️ If the Vercel build fails: most likely cause is `scripts/vercel-build.sh`
     failing to install Rust. Inspect the Vercel build log; the script's first line
     is `set -euo pipefail` so any failure aborts immediately with a clear line number
-- [ ] **0.2** Update root `README.md` to replace the two `_[pending]_` placeholders at
+- [ ] **0.3** Update root `README.md` to replace the two `_[pending]_` placeholders at
   the top with the actual Vercel URL (recording URL still pending until phase 6)
-- [ ] **0.3** Record a 15-second screen capture of just the "Run guided tour" running
+- [ ] **0.4** Record a 15-second screen capture of just the "Run guided tour" running
   on the live Vercel URL — this is a *placeholder* demo for the README until the
   full submission-quality recording in phase 6
   - Acceptance: GIF or short MP4 embedded in README top section
-- [ ] **0.4** Check competitor PR status:
+- [ ] **0.5** Re-check competitor PR status:
   ```bash
   gh pr view 48 --repo logos-co/lambda-prize --json state,updatedAt,reviews,comments
   gh issue view 120 --repo logos-co/ecosystem --json state,updatedAt,comments
