@@ -15,7 +15,9 @@ Submitted to [LP-0017 · Whistleblower](https://github.com/logos-co/lambda-prize
 > **Status:** architecture + scaffold + tests + mocks + interactive WASM demo. Real
 > Logos backend integration (Codex / Waku / SPEL CLI) lives behind the `--features
 > real-logos` and `--features real-spel` flags as stubs ready to be wired up. See
-> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for what's built and what's next.
+> [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for what's built and
+> [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) for the step-by-step
+> plan from here to a winning prize submission.
 
 ## What this is
 
