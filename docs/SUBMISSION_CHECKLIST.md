@@ -69,39 +69,30 @@ Goal: install the toolchain end-to-end and confirm a known-working LEZ program (
 from the LEZ tutorial) builds and deploys. This is the **feasibility gate** — most of
 the integration risk lives here.
 
-**Live status:** in progress. `lgs` installed; circuits extracted (with Intel-Mac
-workaround — see [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md)); `lgs setup` running.
+**Live status:** Native Intel-Mac path blocked — see [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md).
+Pivoted to Docker dev container; see [`docker/README.md`](../docker/README.md).
+Image build running in background.
 
-- [x] **1.1** Install Rust toolchain (if not already):
+- [x] **1.1** Rust + rzup + cargo-risczero — already installed natively (verified)
+- [x] **1.2** `lgs` scaffold CLI — installed natively via `cargo install --path .`
+- [x] **1.3** Discover Intel-Mac toolchain gap:
+  - Tried native `lgs setup` with linux-x86_64 circuits workaround
+  - LEZ source compiled cleanly (2m42s)
+  - `lgs localnet start` panicked on `witness_generator` binary exec
+  - Documented in [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md)
+- [x] **1.4** Docker dev container created — see [`docker/Dockerfile`](../docker/Dockerfile)
+  - Linux x86_64 base (rust:1.95-bookworm)
+  - Pre-installs rzup, cargo-risczero, lgs, wasm-pack, v0.4.1 circuits
+  - Docker-on-Docker pattern via host socket mount
+  - Long-lived caches (cargo-registry, cargo-git, scaffold-cache) survive rebuilds
+- [ ] **1.5** `docker compose build` — running in background, ~10-20 min cold
+- [ ] **1.6** Verify probe project deploys end-to-end inside container:
   ```bash
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-  rustup default stable
-  ```
-- [ ] **1.2** Install [risc0 zkVM toolchain](https://dev.risczero.com/api/zkvm/install):
-  ```bash
-  curl -L https://risczero.com/install | bash
-  rzup install
-  rzup install rust         # installs the risc0 fork of rustc + cargo subcommand
-  ```
-  - Acceptance: `cargo risczero --version` prints v1.x or v3.x
-- [ ] **1.3** Install `lgs` scaffold CLI:
-  ```bash
-  git clone https://github.com/logos-co/scaffold
-  cd scaffold && cargo install --path .
-  lgs --version
-  ```
-  - Acceptance: `lgs` binary is in `~/.cargo/bin/` and prints its version
-- [ ] **1.4** Download `logos-blockchain-circuits` (the proving keys):
-  ```bash
-  # Per scaffold README; URL/version may have updated by submission time.
-  curl -L <release-url> -o circuits.tar.gz
-  mkdir -p ~/.logos-blockchain-circuits && tar -xzf circuits.tar.gz -C ~/.logos-blockchain-circuits
-  export LOGOS_BLOCKCHAIN_CIRCUITS=~/.logos-blockchain-circuits
-  ```
-  - ⚠️ This is typically a multi-GB download. Budget bandwidth and disk.
-- [ ] **1.5** Verify hello-world tutorial works end-to-end:
-  ```bash
-  cd scaffold && lgs new hello-test && cd hello-test
+  docker compose -f docker/compose.yml run --rm dev
+  # inside container:
+  cd /tmp && lgs new probe --template lez-framework && cd probe
+  lgs setup && lgs doctor && lgs localnet start &
+  lgs build && lgs deploy
   lgs setup && lgs localnet start &      # background
   lgs build && lgs deploy
   # Expect: program_id: <64-char-hex>
