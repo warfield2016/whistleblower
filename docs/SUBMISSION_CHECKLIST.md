@@ -69,7 +69,10 @@ Goal: install the toolchain end-to-end and confirm a known-working LEZ program (
 from the LEZ tutorial) builds and deploys. This is the **feasibility gate** — most of
 the integration risk lives here.
 
-- [ ] **1.1** Install Rust toolchain (if not already):
+**Live status:** in progress. `lgs` installed; circuits extracted (with Intel-Mac
+workaround — see [INTEGRATION_NOTES.md](INTEGRATION_NOTES.md)); `lgs setup` running.
+
+- [x] **1.1** Install Rust toolchain (if not already):
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   rustup default stable
