@@ -24,9 +24,9 @@ Source material for the GitHub issues to file in phase 7.4.
 
 2. **`logos-blockchain-circuits` v0.4.1** — see workaround below.
 
-## ⚠️ Workaround: Intel Mac circuits gap
+## ⚠️ Hard blocker: Intel Mac + Logos toolchain incompatibility
 
-**The blocker:** the `logos-blockchain-circuits` GitHub release only ships
+**The blocker:** the `logos-blockchain-circuits` GitHub release ships
 four platform tarballs:
 - `linux-aarch64`
 - `linux-x86_64`
@@ -34,46 +34,76 @@ four platform tarballs:
 - `windows-x86_64`
 
 **There is no `macos-x86_64` build.** Intel Macs are not natively supported by
-the Logos toolchain release artifacts. The scaffold's `circuits.rs` tries to
-auto-download `<triple>`, which fails on Intel macOS with a "no asset"
-download error.
+the Logos toolchain release artifacts.
 
-**The workaround:** the circuits archive contents are *platform-agnostic JSON
-verification keys* plus *platform-specific helper binaries* (`prover`,
-`verifier`, `witness_generator`). Per the scaffold's
-[`circuits.rs`](https://github.com/logos-co/scaffold/blob/main/src/circuits.rs)
-docs:
+### What I tried first (the partial workaround)
 
-> scaffold-managed projects only consume the verification keys at compile
-> time
+I initially thought the JSON verification keys were platform-agnostic and the
+binaries (`prover`, `verifier`, `witness_generator`) were only needed for
+*proof generation* on the user side — which our path wouldn't invoke. Per
+the scaffold's [`circuits.rs`](https://github.com/logos-co/scaffold/blob/main/src/circuits.rs) module docs:
 
-So:
-- The **`.json` keys** in `pol/`, `poc/`, `poq/`, `zksign/` are platform-agnostic
-- The **binaries** are needed only at runtime for Circom-based zk proof
-  generation, which our path (public LEZ txns + RISC0 zkVM internal proofs)
-  doesn't invoke
+> scaffold-managed projects only consume the verification keys at compile time
 
-**The escape hatch the scaffold builds in** is the `LOGOS_BLOCKCHAIN_CIRCUITS`
-env var. When set, the version check is skipped and the directory is used
-as-is — independent of which platform's tarball was extracted.
+I extracted the `linux-x86_64` tarball into `~/.logos-blockchain-circuits/`
+and exported `LOGOS_BLOCKCHAIN_CIRCUITS=$HOME/.logos-blockchain-circuits`.
+This cleared the `lgs doctor` circuits check and let `lgs setup` succeed —
+compiling the LEZ sequencer + wallet from source (2m42s).
 
-Concrete steps (use the `linux-x86_64` tarball on Intel macOS):
+### Why it doesn't fully work
 
-```bash
-curl -L -o /tmp/circuits.tar.gz \
-  "https://github.com/logos-blockchain/logos-blockchain-circuits/releases/download/v0.4.1/logos-blockchain-circuits-v0.4.1-linux-x86_64.tar.gz"
-tar -xzf /tmp/circuits.tar.gz -C ~/
-mv ~/logos-blockchain-circuits-v0.4.1-linux-x86_64 ~/.logos-blockchain-circuits
-export LOGOS_BLOCKCHAIN_CIRCUITS="$HOME/.logos-blockchain-circuits"
-# Persist:
-echo 'export LOGOS_BLOCKCHAIN_CIRCUITS="$HOME/.logos-blockchain-circuits"' >> ~/.zshrc
+Starting the localnet fails at runtime in the sequencer's *signing* path:
+
+```
+thread 'main' panicked at logos-blockchain.../kms/keys/zk/private.rs:57:56:
+Signature should succeed:
+  witness-generator command failed:
+  ~/.logos-blockchain-circuits/zksign/witness_generator: cannot execute binary file
 ```
 
-Acceptance: `lgs doctor` reports `PASS | logos-blockchain-circuits`.
+The sequencer's `zksign` keys subsystem invokes the `witness_generator`
+binary at startup — even for public-only transactions. The
+linux-x86_64 binary obviously can't execute on macOS. So the
+"verification-keys-only" assumption in `circuits.rs` is incomplete: at
+*runtime*, the binaries inside the circuits archive are also needed.
 
-**The GitHub issue to file** (phase 7.4): request macos-x86_64 artifacts OR
-document the linux-x86_64 cross-platform workaround in the scaffold README so
-Intel Mac developers don't lose 30 minutes debugging the download failure.
+### Three viable paths forward
+
+| Path | Local-dev experience | Cost | Risk |
+|---|---|---|---|
+| **A. Docker (everything in a Linux container)** | Edit natively in macOS, run `lgs *` inside a container. Project mounted as a volume. | Free, ~15 min setup | Docker-in-Docker for cargo-risczero may be tricky. |
+| **B. GitHub Codespaces** | VS Code remote, native Linux x86_64. Free 60h/mo. | Free | Outbound network restrictions may bite when fetching Logos circuits. |
+| **C. Cloud Linux VM (Hetzner / DigitalOcean)** | SSH + tmux. Asciinema for the recording. | $5-20/mo | Most engineering setup; the recording quality vs Loom on Mac is a concern. |
+
+Path A is the lowest-friction first try since Docker is already installed.
+Path B is the cleanest long-term — also has prior LP-prize precedent (see
+`project_lp0013_declined` memory: "Codespaces browser demo... +4hr to
+sprint, no competitor offers it"). Path C is the fallback.
+
+### What this blocks
+
+Phases 1.5, 2.6, 4, 6 (real-CLI demo segment), 7.1 all need a Linux env
+where the witness_generator binary can actually run. The web demo
+(Vercel), the mocked-pipeline tests (current 46 green), and all
+Rust-only code work fine on the Mac.
+
+### Concrete GitHub issue to file (phase 7.4)
+
+Title: `Intel macOS not buildable — sequencer panics on witness_generator exec`
+
+Repo: `logos-co/scaffold` (with cross-link to `logos-blockchain/logos-execution-zone`)
+
+Body:
+- The circuits release has no `macos-x86_64` asset.
+- Falling back to `linux-x86_64` via `LOGOS_BLOCKCHAIN_CIRCUITS` passes
+  `lgs doctor` and lets `lgs setup` complete, but the sequencer panics
+  on first run in `kms/keys/zk/private.rs:57` when invoking the
+  linux-built `witness_generator` binary.
+- Suggested fixes: (a) ship `macos-x86_64` in `logos-blockchain-circuits`
+  releases; or (b) document the requirement in scaffold README so Intel
+  Mac users pivot to Docker/Codespaces early; or (c) make the scaffold's
+  `doctor` check that the `witness_generator` binary is executable on
+  the current platform.
 
 ## Other doctor warnings
 
