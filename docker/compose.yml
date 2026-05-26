@@ -1,0 +1,46 @@
+# Docker Compose for the Logos LEZ dev container.
+#
+# Usage (from repo root):
+#   docker compose -f docker/compose.yml build     # one-time, ~10-20 min cold
+#   docker compose -f docker/compose.yml run --rm dev
+#
+# The `dev` service mounts the project at /work and the host Docker socket
+# so cargo risczero build (which spawns its own containers internally) can
+# reach the host daemon.
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: whistleblower-dev:latest
+    # tty + stdin_open so we get an interactive bash shell when running
+    # via `docker compose run --rm dev`.
+    tty: true
+    stdin_open: true
+    working_dir: /work
+    volumes:
+      # The whistleblower repo (parent of docker/) mounted in.
+      - ../:/work
+      # Host Docker socket so `cargo risczero build` invokes the host daemon
+      # rather than trying to start a nested daemon. This is the DooD pattern.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Named volumes for the long-lived caches — these survive container
+      # restarts and avoid rebuilding LEZ / cargo registry on every run.
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - scaffold-cache:/root/.cache/logos-scaffold
+    ports:
+      # LEZ sequencer (default port from scaffold.toml).
+      - "3040:3040"
+    environment:
+      # Inside-container env. The Dockerfile already sets PATH and
+      # LOGOS_BLOCKCHAIN_CIRCUITS, but exposing here documents the contract.
+      RUST_BACKTRACE: "1"
+      LOGOS_BLOCKCHAIN_CIRCUITS: /root/.logos-blockchain-circuits
+    command: /bin/bash
+
+volumes:
+  cargo-registry:
+  cargo-git:
+  scaffold-cache:
