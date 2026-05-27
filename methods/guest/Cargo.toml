@@ -1,0 +1,26 @@
+[package]
+name = "chronicle_registry_programs"
+version = "0.1.0"
+edition = "2024"
+license = { workspace = true }
+
+[dependencies]
+# nssa_core provides ProgramInput, ProgramOutput, AccountPostState, Claim,
+# and read_nssa_inputs — the canonical LEZ guest I/O surface.
+nssa_core.workspace = true
+
+# risc0-zkvm provides the guest::entry! macro and runtime intrinsics.
+risc0-zkvm.workspace = true
+
+# Wire types are inlined into the guest binary (see comment at the top of
+# chronicle_registry.rs). We don't pull in registry-core via path because
+# the docker build context for cargo-risczero is rooted at the guest dir
+# and can't see crates outside the methods/ workspace.
+
+# Borsh for state serialization in the account data field.
+borsh.workspace = true
+
+[[bin]]
+name = "chronicle_registry"
+path = "src/bin/chronicle_registry.rs"
+test = false

@@ -7,10 +7,13 @@ members = [
     "crates/batch-anchor",
     "programs/chronicle-registry",
 ]
-# web-demo is built via wasm-pack, not part of the default workspace build.
-# It depends on registry-core via path and is intentionally excluded so
-# `cargo test --workspace` stays fast and doesn't try to build for wasm32.
-exclude = ["web-demo"]
+# Separate Cargo workspaces (excluded from the root) — each pins different
+# git deps and uses different edition/resolver, so keeping them out of the
+# root workspace avoids dep resolution + edition conflicts.
+exclude = [
+    "web-demo",  # built via wasm-pack, target = wasm32-unknown-unknown
+    "methods",   # the RISC0 guest workspace (edition 2024, resolver 3, LEZ git deps)
+]
 
 [workspace.package]
 version = "0.1.0"
