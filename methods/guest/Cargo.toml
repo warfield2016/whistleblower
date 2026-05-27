@@ -20,6 +20,10 @@ risc0-zkvm.workspace = true
 # Borsh for state serialization in the account data field.
 borsh.workspace = true
 
+# serde — required by nssa_core's read_nssa_inputs trait bound
+# (DeserializeOwned for the Instruction type).
+serde.workspace = true
+
 [[bin]]
 name = "chronicle_registry"
 path = "src/bin/chronicle_registry.rs"

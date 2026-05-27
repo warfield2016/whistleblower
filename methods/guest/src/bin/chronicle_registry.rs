@@ -25,6 +25,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::program::{
     AccountPostState, Claim, ProgramInput, ProgramOutput, read_nssa_inputs,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ---- inlined wire types (mirror of registry-core) ----
@@ -33,19 +34,19 @@ pub const MAX_BATCH_ENTRIES: usize = 50;
 pub const METADATA_HASH_LEN: usize = 32;
 pub const CURRENT_REGISTRY_ENTRY_VERSION: u8 = 1;
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub enum Instruction {
     InitRegistry,
     IndexBatch { entries: Vec<EntryRequest> },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct EntryRequest {
     pub cid: String,
     pub metadata_hash: [u8; METADATA_HASH_LEN],
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct RegistryEntry {
     pub cid: String,
     pub metadata_hash: [u8; METADATA_HASH_LEN],
