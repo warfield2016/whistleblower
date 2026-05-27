@@ -85,14 +85,21 @@ Image build running in background.
   - Pre-installs rzup, cargo-risczero, lgs, wasm-pack, v0.4.1 circuits
   - Docker-on-Docker pattern via host socket mount
   - Long-lived caches (cargo-registry, cargo-git, scaffold-cache) survive rebuilds
-- [ ] **1.5** `docker compose build` — running in background, ~10-20 min cold
-- [ ] **1.6** Verify probe project deploys end-to-end inside container:
+- [x] **1.5** `docker compose build` — done. Image is 4.42GB. ~24min cold.
+- [x] **1.6** Probe project bootstrap inside container ✅
+  - `lgs new probe --template lez-framework` → instant (LEZ source cached)
+  - `lgs setup` → ~3 min cold (compiles LEZ + spel binaries in container)
+  - `lgs doctor` → **19 PASS, 5 WARN, 0 FAIL** (all WARNs are expected:
+    nix not installed = only needed for phase 5, sequencer not yet started)
+  - SPEL pin resolves cleanly in the container's scaffold version (different
+    pin than the native run had, no FAIL)
+- [ ] **1.7** Verify localnet + build + deploy inside container:
   ```bash
-  docker compose -f docker/compose.yml run --rm dev
-  # inside container:
-  cd /tmp && lgs new probe --template lez-framework && cd probe
-  lgs setup && lgs doctor && lgs localnet start &
-  lgs build && lgs deploy
+  docker compose -f docker/compose.yml run --rm -p 3040:3040 dev bash -c '
+    cd /tmp/probe   # already created in 1.6
+    lgs localnet start &
+    sleep 5
+    lgs build && lgs deploy
   lgs setup && lgs localnet start &      # background
   lgs build && lgs deploy
   # Expect: program_id: <64-char-hex>

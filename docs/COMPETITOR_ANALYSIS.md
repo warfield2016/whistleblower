@@ -8,17 +8,40 @@ their public repo + `gh` queries against `logos-co/lambda-prize#48` and
 
 | Signal | Value |
 |---|---|
-| PR opened | 2026-05-12 (13 days ago) |
-| Last code commit | 2026-05-15 (`setup.sh: run lgs setup; expand spel pin to full SHA`) |
-| Last reviewer activity | 2026-05-19 — `weboko`: "Hi! Thank you for your submission. I will review later this week..." |
-| Last tracking comment | 2026-05-21 — `fryorcraken`: "@weboko to continue review of submission." |
-| **Days since reviewer promised feedback** | **6** |
-| **Days since tracking ping** | **4** |
-| Validation status | ⚠️ Non-blocking warning: "Prize references a Logos mini-app; no `module.json` found." |
+| PR opened | 2026-05-12 |
+| Last code commit (theirs) | 2026-05-15 |
+| Reviewer assigned | 2026-05-21 — `fryorcraken`: "@weboko to continue review of submission." |
+| Reviewer first feedback | 2026-05-25 — `weboko`: "I left some comments... will try to play with your submitted software" |
+| Reviewer concrete blockers | 2026-05-26 — `weboko`: 3 blockers (see below) |
+| Latest activity | 2026-05-27 — `Thompsonmina` responded; review back-and-forth ongoing |
+| Validation status | ⚠️ Non-blocking warning: missing `module.json` (still unresolved) |
 | PR mergeable | Yes |
 | Author | Thompsonmina (`Thompson`) |
 
-**Read:** Review is stalled. The window is real.
+**Read:** Review is **actively in progress** as of 2026-05-27. Three concrete
+blockers raised; some require upstream changes outside Thompson's control.
+
+### Reviewer's 3 blockers (2026-05-26) and Thompson's defense (2026-05-27)
+
+| # | weboko's blocker | Thompson's defense | Our takeaway |
+|---|---|---|---|
+| 1 | Submission depends on a **custom SPEL fork pin** — wants upstream SPEL for submission | "Upstream SPEL can't invoke `Vec<String>` args — that's what my [logos-co/spel#189](https://github.com/logos-co/spel/pull/189) solves." | They're **blocked on an upstream merge** that's outside Thompson's control. |
+| 2 | `batch-anchor.toml` has **hardcoded `program_id`** that didn't match weboko's local deploy | "It's deterministic via `make build` (risc0 reproducible builds)." But weboko's deploy still didn't match. | This is a **clean-clone reproducibility issue** — exactly the failure mode that phase 7.1 of our checklist defends against. |
+| 3 | "Mismatch with how CIDs are passed to spel — would fail if more than one passed" | "Fixed in latest push: switched from CSV format to repeated flag syntax." | Real bug that was in their submission until 2026-05-27. |
+
+**Strategic implication:** Even if Thompson addresses issues 2 + 3 quickly, issue 1
+(upstream SPEL PR merge) is a hard dependency on a third party. Our submission
+should:
+
+- **Use `lez-framework`, not SPEL.** Completely sidesteps issues 1 and 3 by
+  not depending on the spel CLI's argument parsing at all.
+- **Pass `program_id` via env var or CLI arg**, never hardcoded. Phase 7.1
+  fresh-clone test catches this before submission.
+- **Keep our window monitoring active.** Review is moving — we may have
+  weeks, but we shouldn't assume months.
+
+**Read:** Window is still real but narrower than the prior "6 days stalled"
+assessment. Estimate: 1-2 weeks before this PR resolves one way or the other.
 
 ## Repo shape
 
