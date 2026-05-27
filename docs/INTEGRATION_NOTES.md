@@ -105,6 +105,110 @@ Body:
   `doctor` check that the `witness_generator` binary is executable on
   the current platform.
 
+---
+
+## Second blocker discovered (phase 2): `ruint 1.18` vs risc0 rustc 1.88-dev
+
+Once the Docker pivot was in place and the toolchain ran, the **risc0 guest
+build** failed with:
+
+```
+error: rustc 1.88.0-dev is not supported by the following package:
+  ruint@1.18.0 requires rustc 1.90
+Either upgrade rustc or select compatible dependency versions with
+`cargo update <name>@<current-ver> --precise <compatible-ver>`
+```
+
+`ruint` is pulled in transitively by `nssa_core`'s dependency tree (the
+`ark-*` crates that handle BN254 elliptic-curve operations).
+
+The same blocker affects the **scaffold's own canonical lez-framework
+probe project**, so it's not specific to our methods/ setup — it's an
+upstream pin-matrix issue.
+
+### Workaround that works
+
+After `cargo generate-lockfile --manifest-path methods/guest/Cargo.toml`:
+
+```bash
+cargo update -p ruint --precise 1.17.0 --manifest-path methods/guest/Cargo.toml
+```
+
+Then `cargo risczero build` succeeds. The pin lives in
+`methods/Cargo.lock` and is committed.
+
+### Concrete GitHub issue to file (phase 7.4, #3)
+
+Title: `ruint 1.18.0 (requires rustc 1.90) breaks risc0 docker build (rustc 1.88-dev)`
+
+Repo: `logos-blockchain/logos-execution-zone`
+
+Body:
+- A fresh `lgs new my-project --template lez-framework && lgs setup && lgs build`
+  fails at the guest build stage with the rustc-version-skew error above
+- `nssa_core`'s transitive deps include `ruint 1.18.0` which requires
+  rustc 1.90+, but the risc0 docker image's bundled rustc is 1.88-dev
+- Workaround: pin ruint to 1.17.0 in Cargo.lock before building
+- Suggested fixes: (a) pin `ruint = "=1.17.0"` in nssa_core or one of
+  the ark-* deps; (b) bump the risc0 docker image's bundled rustc to a
+  version ruint 1.18 accepts; (c) document the workaround in the
+  lez-framework template's README so first-time users aren't blocked
+
+---
+
+## Third blocker (phase 2): `lez-framework` template doesn't compile
+
+The scaffold's canonical `lez-framework` template at the current pin
+(`jimmy-claw/lez-framework` rev `1e146970`) fails to compile its
+`lez_counter.rs` example with 6 errors:
+
+```
+error[E0425]: cannot find function `write_nssa_outputs_with_chained_call` in module `nssa_core::program`
+error: pattern requires `..` due to inaccessible fields
+error[E0308]: arguments to this function are incorrect (×3)
+error[E0282]: type annotations needed
+```
+
+These are API drift between the lez-framework rev and the LEZ nssa_core
+rev — the framework expects functions/signatures that no longer exist
+upstream.
+
+### Workaround (the one we took)
+
+**Don't use lez-framework.** Use the hand-rolled `nssa_core::program::*`
+pattern from LEZ's own `examples/program_deployment/methods/guest/src/bin/hello_world.rs`,
+which uses:
+
+```rust
+use nssa_core::program::{
+    AccountPostState, Claim, ProgramInput, ProgramOutput, read_nssa_inputs,
+};
+
+fn main() {
+    let (ProgramInput { /* ... */ }, instruction_data) =
+        read_nssa_inputs::<Instruction>();
+    // ...
+    let post_state = AccountPostState::new_claimed_if_default(post_account, Claim::Authorized);
+    ProgramOutput::new(/* ... */).write();
+}
+risc0_zkvm::guest::entry!(main);
+```
+
+This pattern doesn't depend on any framework macros and compiles cleanly
+against `nssa_core` at the current LEZ pin. Our
+[`methods/guest/src/bin/chronicle_registry.rs`](../methods/guest/src/bin/chronicle_registry.rs)
+follows this approach.
+
+### Concrete GitHub issue to file (phase 7.4, #4)
+
+Title: `lez-framework template doesn't compile against current LEZ pin`
+
+Repo: `logos-co/scaffold` (with cross-link to `jimmy-claw/lez-framework`)
+
+Body: similar to the ruint one — request that the lez-framework rev pin
+in `templates/lez-framework/Cargo.toml.template` be bumped to one that
+compiles against the LEZ rev the scaffold currently pins.
+
 ## Other doctor warnings
 
 - ⚠️ **`nix` not installed** — only required for phase 5 (`.lgx` package build
